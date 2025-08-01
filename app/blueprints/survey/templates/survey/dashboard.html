@@ -1,0 +1,94 @@
+{% extends 'base.html' %} {% block title %}Dashboard{% endblock %} {% block
+content %}
+<div class="bg-gray-50 min-h-screen font-sans">
+  <div class="container mx-auto p-6">
+    <header class="w-full mb-6 border-b-gray-500-2 shadow-sm pb-4 px-4">
+      <div
+        class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center"
+      >
+        <div>
+          <h1 class="text-xl font-semibold">Survey Platform</h1>
+          <p class="text-gray-600">Welcome back, {{ username }}</p>
+        </div>
+        <form action="{{ url_for('auth.logout')}}" method="POST">
+          <button
+            type="submit"
+            class="flex items-center justify-between space-x-4 px-2 py-2 rounded-md hover:bg-gray-100 transition hover:shadow-sm"
+          >
+            <img
+              src="{{ url_for('static', filename='assets/exit.png') }}"
+              alt=""
+              class="h-6 w-6"
+            />
+            <span class="text-gray-700">Logout</span>
+          </button>
+        </form>
+      </div>
+    </header>
+    <!-- Header -->
+
+    <!-- Stats Cards -->
+    <div class="max-w-7xl mx-auto p-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-lg p-4 shadow">
+          <h2 class="text-gray-500">Total Surveys</h2>
+          <p class="text-2xl font-bold">{{ total_surveys }}</p>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow">
+          <h2 class="text-gray-500">Total Responses</h2>
+          <p class="text-2xl font-bold">{{ total_responses }}</p>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow">
+          <h2 class="text-gray-500">Published Surveys</h2>
+          <p class="text-2xl font-bold">{{ published_surveys }}</p>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="mb-4">
+        <button
+          onclick="toggleTab('surveys')"
+          class="px-4 py-2 bg-black text-white rounded-l"
+        >
+          My Surveys
+        </button>
+        <button
+          onclick="toggleTab('responses')"
+          class="px-4 py-2 bg-gray-200 text-black rounded-r"
+        >
+          Recent Responses
+        </button>
+      </div>
+
+      <!-- Content Area -->
+      <div id="surveys" class="space-y-4">
+        {% for survey in surveys %}
+        <div
+          class="bg-white p-4 rounded shadow flex justify-between items-center"
+        >
+          <div>
+            <h3 class="font-medium">{{ survey.title }}</h3>
+            <p class="text-sm text-gray-500">Submitted {{ survey.date }}</p>
+          </div>
+          <span class="bg-black text-white px-2 py-1 rounded text-sm">New</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div id="responses" class="hidden">
+        <!-- Response content here -->
+        <p class="text-gray-600">No recent responses yet.</p>
+      </div>
+
+      <!-- Create Survey Button -->
+      <div class="mt-6">
+        <a
+          href="{{ url_for('survey.create') }}"
+          class="bg-black text-white px-4 py-2 rounded inline-block"
+          >+ Create Survey</a
+        >
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

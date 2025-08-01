@@ -1,0 +1,18 @@
+{% extends 'base.html' %} {% block title %}Welcome{% endblock %} {% block
+content %}
+<div class="flex flex-col self-center justify-center">
+  <h1 class="text-5xl font-bold m-4">Welcome to Survey Master</h1>
+  <div class="flex space-x-4">
+    <a
+      href="{{ url_for('auth.register') }}"
+      class="px-4 py-2 text-black rounded hover:bg-red-500"
+      >Register</a
+    >
+    <a
+      href="{{ url_for('auth.login') }}"
+      class="px-4 py-2 text-black rounded hover:bg-red-500"
+      >Login</a
+    >
+  </div>
+</div>
+{% endblock %}
