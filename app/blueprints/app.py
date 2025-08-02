@@ -1,16 +1,35 @@
 from flask import Flask
-from app.blueprints.extensions import db, migrate
+from app.blueprints.extensions import db, migrate, mail
 from flask_login import LoginManager
+from dotenv import load_dotenv
+import os
+
+
+load_dotenv()
 
 def create_app():
   app = Flask(__name__, template_folder='../templates', static_folder='../static')
-  app.config['SECRET_KEY'] = 'replace-this-with-a-strong-secret-key'
-  app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://flaskuser:Misterambrose1$@localhost/survey_db"
+    # Config from environment
+  app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+  app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
+
+  # Mail config
+  app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER')
+  app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT'))
+  app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS') == 'true'
+  app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+  app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+  app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+
+  
+  
   db.init_app(app)
   migrate.init_app(app, db)
+  mail.init_app(app)
   
   login_manager = LoginManager()
   login_manager.init_app(app)
+  # rate_limit_tracker = {}
 
   @login_manager.user_loader
   def load_user(user_id):
