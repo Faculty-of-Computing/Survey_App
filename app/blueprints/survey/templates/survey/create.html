@@ -205,14 +205,15 @@ content %}
         .then((response) => {
           if (!response.ok) {
             return response.text().then((text) => {
-              console.error("Server Error Response:", text);
-              throw new Error(`Server responded with ${response.status}`);
+              throw new Error(text);
             });
           }
           return response.json();
         })
-        .then((json) => {
-          alert("Survey " + json.survey_id + " saved");
+        .then((data) => {
+          alert("Survey " + data.survey_id + " saved");
+          // perform the redirect client‐side
+          window.location = data.redirect;
         })
         .catch((error) => {
           console.error("Fetch Error:", error);

@@ -8,6 +8,11 @@ class User(UserMixin, db.Model):
   username = db.Column(db.String, nullable=False)
   email = db.Column(db.String, nullable=False, unique=True)
   password = db.Column(db.String, nullable=False)
+  surveys = db.relationship(
+        'Survey',
+        back_populates='user',
+        cascade='all, delete-orphan'
+    )
   
   def __repr__(self):
     return f"<PERSON {self.username}>"

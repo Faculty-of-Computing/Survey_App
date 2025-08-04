@@ -1,7 +1,8 @@
 # routes.py
-from flask import Blueprint, render_template, request, jsonify, abort
+from flask import Blueprint, render_template, request, url_for , abort, jsonify
 from flask_login import login_required, current_user
 from .models import db, Survey, Question
+from app.blueprints.people.models import User
 import re
 
 survey = Blueprint('survey', __name__, template_folder='templates', url_prefix='/survey')
@@ -9,7 +10,14 @@ survey = Blueprint('survey', __name__, template_folder='templates', url_prefix='
 @survey.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('survey/dashboard.html', username=current_user.username)
+    surveys = Survey.query.filter_by(user_id=current_user.uid).all()
+    for s in surveys:
+        s.questions_length = len(s.questions)
+    return render_template(
+        'survey/dashboard.html',
+        username=current_user.username,
+        surveys=surveys
+    )
 
 @survey.route('/create', methods=['GET'])
 @login_required
@@ -77,7 +85,7 @@ def save_survey():
         ))
 
     # Save survey
-    survey_obj = Survey(title=title, description=description, publish=publish)
+    survey_obj = Survey(title=title, description=description, publish=publish, user_id=current_user.uid)
     db.session.add(survey_obj)
     db.session.flush()  # assign id
 
@@ -87,4 +95,9 @@ def save_survey():
         db.session.add(qobj)
 
     db.session.commit()
-    return jsonify({'status': 'success', 'survey_id': survey_obj.id}), 201
+    #jsonify({'status': 'success', 'survey_id': survey_obj.id}), 201
+    return jsonify({
+        'status': 'success',
+        'survey_id': survey_obj.id,
+        'redirect': url_for('survey.dashboard')
+    }), 201
