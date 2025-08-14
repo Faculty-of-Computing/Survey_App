@@ -14,6 +14,7 @@ def generate_otp():
     return str(random.randint(100000, 999999))
 
 
+
 @auth.route("/register", methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':

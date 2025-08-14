@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect,url_for
 from app.blueprints.extensions import db, migrate, mail
 from flask_login import LoginManager
 from dotenv import load_dotenv
@@ -9,6 +9,9 @@ load_dotenv()
 
 def create_app():
   app = Flask(__name__, template_folder='../templates', static_folder='../static')
+  @app.route('/')
+  def index():
+    return redirect(url_for('auth.login'))
     # Config from environment
   app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
   app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
@@ -38,10 +41,8 @@ def create_app():
   
   
   from app.blueprints.people.route import auth
-  from app.blueprints.core.route import home
   from app.blueprints.survey.route import survey
   app.register_blueprint(auth, url_prefix='/auth')
-  app.register_blueprint(home)
   app.register_blueprint(survey, url_prefix='/survey')
   
   return app

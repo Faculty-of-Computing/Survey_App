@@ -65,7 +65,7 @@ content %}
             />
           </div>
 
-          <p class="text-2xl font-bold">{{ published_surveys }}</p>
+          <p class="text-2xl font-bold">{{ total_published }}</p>
         </div>
       </div>
 
@@ -129,18 +129,35 @@ content %}
                 Created by: {{ survey.user.username }} at {{
                 survey.created_at.strftime('%Y-%m-%d %H:%M') }}
               </p>
-              <p class="text-sm text-gray-500 my-2">
-                Last updated: {{ survey.updated_at.strftime('%Y-%m-%d %H:%M') }}
-              </p>
             </div>
           </div>
           {% endfor %}
         </div>
         {% else %}
         <p class="my-4 font-sans">You haven’t created any surveys yet.</p>
-        {% endif %} {% if not response %}
+        {% endif %} {% if surveys %}
+        <div id="responses" class="hidden space-y-4">
+          {% for survey in responses %}
+          <div
+            class="bg-white p-4 rounded shadow flex justify-between items-center"
+          >
+            <div>
+              <h3 class="font-bold">{{ survey.title }}</h3>
+              <p class="text-sm text-gray-500">
+                Submitted at {{ survey.created_at.strftime('%Y-%m-%d %H:%M') }}
+              </p>
+            </div>
+            <button
+              class="view-questions-btn bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md"
+              data-survey-id="{{ survey.id }}"
+            >
+              View Questions
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
         <div id="responses" class="hidden">
-          <!-- Response content here -->
           <p class="text-gray-600">No recent responses yet.</p>
         </div>
         {% endif %}
@@ -148,4 +165,158 @@ content %}
     </div>
   </div>
 </div>
+{% endblock %} {% block js %}
+<script>
+  function toggleTab(tab) {
+    document
+      .getElementById("surveys")
+      .classList.toggle("hidden", tab !== "surveys");
+    document
+      .getElementById("responses")
+      .classList.toggle("hidden", tab !== "responses");
+  }
+  document.querySelectorAll(".view-questions-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const surveyId = btn.dataset.surveyId;
+
+      const resp = await fetch("{{ url_for('survey.fetch_questions') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ survey_id: surveyId }),
+      });
+
+      if (!resp.ok) {
+        return alert("Could not load questions");
+      }
+
+      const data = await resp.json();
+      buildSurveyForm(data);
+    });
+  });
+
+  function buildSurveyForm(data) {
+    const container = document.createElement("div");
+    container.innerHTML = `
+        <div class="flex flex-col mx-auto p-6 bg-white rounded-lg shadow-xl">
+          <h2 class="text-4xl font-bold text-center mb-4">${
+            data.survey.title
+          }</h2>
+          <p class="text-center mb-4">${data.survey.description}</p>
+          <form id="survey-form" enctype="multipart/form-data" class="space-y-4 flex flex-col">
+              ${data.questions.map((q) => renderQuestion(q)).join("")}
+            <div class="flex gap-8 flex-wrap justify-center mt-4">
+              <button 
+                type="submit"
+                class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded w-full sm:w-auto"
+              >
+                Submit
+              </button>
+              <a 
+                href="{{ url_for('survey.dashboard') }}"
+                class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded w-full sm:w-auto text-center"
+              >
+                Back to Dashboard
+              </a>
+            </div>
+          </form>
+        </div>
+    `;
+    document.body.innerHTML = "";
+    document.body.appendChild(container);
+
+    document
+      .getElementById("survey-form")
+      .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const submitResp = await fetch(`/survey/submit/${data.survey.id}`, {
+          method: "POST",
+          body: formData,
+        });
+        const result = await submitResp.json();
+        alert(result.message);
+      });
+  }
+
+  function renderQuestion(q) {
+    // Shared wrapper styles for each question
+    const wrapperStart = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm flex flex-col gap-2 my-10">`;
+    const wrapperEnd = `</div>`;
+
+    if (q.type === "Text Response") {
+      return `${wrapperStart}
+      <label class="font-bold text-gray-700">${q.text}</label>
+      <input 
+        class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+        type="text" 
+        name="q${q.id}" ${q.required ? "required" : ""}>
+    ${wrapperEnd}`;
+    } else if (q.type === "Multiple Choice") {
+      return `${wrapperStart}
+      <label class="font-bold text-gray-700">${q.text}</label>
+      <div class="flex flex-col gap-2">
+        ${q.options
+          .map(
+            (opt) => `
+          <label class="flex items-center gap-2">
+            <input 
+              type="radio" 
+              name="q${q.id}" 
+              value="${opt}" 
+              class="text-green-500 focus:ring-green-400" 
+              ${q.required ? "required" : ""}>
+            <span>${opt}</span>
+          </label>
+        `
+          )
+          .join("")}
+      </div>
+    ${wrapperEnd}`;
+    } else if (q.type === "Rating (1–5)") {
+      return `${wrapperStart}
+      <label class="font-bold text-gray-700">${q.text}</label>
+      <div class="flex gap-4">
+        ${[1, 2, 3, 4, 5]
+          .map(
+            (num) => `
+          <label class="flex items-center gap-1">
+            <input type="radio" 
+              name="q${q.id}" 
+              value="${num}" 
+              class="text-green-500 focus:ring-green-400"
+              ${q.required ? "required" : ""}>
+            <span>${num}</span>
+          </label>
+        `
+          )
+          .join("")}
+      </div>
+    ${wrapperEnd}`;
+    } else if (q.type === "Slider/Range") {
+      return `${wrapperStart}
+      <label class="font-bold text-gray-700">${q.text}</label>
+      <input 
+        type="range"
+        class="w-full accent-green-500"
+        name="q${q.id}" 
+        min="0" max="100" value="50" 
+        ${q.required ? "required" : ""}>
+    ${wrapperEnd}`;
+    } else if (q.type === "File Upload") {
+      return `${wrapperStart}
+      <label class="font-bold text-gray-700">${q.text}</label>
+      <input 
+        type="file" 
+        class="w-full border border-gray-300 rounded px-3 py-2"
+        name="q${q.id}" ${q.required ? "required" : ""}>
+    ${wrapperEnd}`;
+    }
+
+    // Default fallback
+    return `${wrapperStart}
+    <label class="font-bold text-gray-700">${q.text}</label>
+    <input type="text" name="q${q.id}" ${q.required ? "required" : ""}>
+  ${wrapperEnd}`;
+  }
+</script>
 {% endblock %}
