@@ -1,5 +1,6 @@
 # routes.py
 import os
+import json
 from flask import Blueprint, render_template, request, url_for , abort, jsonify
 from flask_login import login_required, current_user
 from .models import db, Survey, Question, Answer, Response
@@ -80,16 +81,29 @@ def save_survey():
 
         allowed = None
         max_mb = None
+
+        # File Upload: validate extensions and max size
         if qtype == 'File Upload':
             allowed_list = [ft.strip() for ft in q.get('allowed_types', []) if ft.strip()]
             if not all(file_type_pattern.match(ft) for ft in allowed_list):
                 abort(400, f'Question {idx}: invalid file types')
 
-            allowed = ','.join(allowed_list)
-
             max_mb = q.get('max_size_mb')
             if not isinstance(max_mb, int) or max_mb < 1 or max_mb > 100:
                 abort(400, f'Question {idx}: max_size_mb must be 1–100')
+
+            # store JSON string of allowed extensions
+            allowed = json.dumps(allowed_list)
+
+        # Multiple Choice (and similar types that carry options)
+        elif qtype in ('Multiple Choice', 'Checkboxes', 'Multiple Selection'):
+            opts = [str(opt).strip() for opt in q.get('allowed_types', []) if str(opt).strip()]
+            if len(opts) == 0:
+                abort(400, f'Question {idx}: multiple-choice questions require at least one option')
+            # store JSON string of options
+            allowed = json.dumps(opts)
+
+        # otherwise allowed remains None
 
         q_objs.append(Question(
             text=text,
@@ -98,6 +112,7 @@ def save_survey():
             allowed_types=allowed,
             max_size_mb=max_mb
         ))
+
 
     # Save survey
     survey_obj = Survey(title=title, description=description, publish=publish, user_id=current_user.uid)
@@ -118,16 +133,19 @@ def save_survey():
     }), 201
     
 
-# --- Fetch Questions as JSON (SPA style) ---
 @survey.route('/fetch-questions', methods=['POST'])
 @login_required
 def fetch_questions():
     data = request.get_json() or {}
     sid = data.get('survey_id')
 
-    survey_obj = Survey.query.filter_by(id=sid, user_id=current_user.uid).first()
+    survey_obj = Survey.query.filter_by(id=sid).first()
     if not survey_obj:
         return jsonify({"error": "Survey not found"}), 404
+
+    # Allow owner or allow if survey is published
+    if survey_obj.user_id != current_user.uid and not survey_obj.publish:
+        return jsonify({"error": "Survey not available"}), 403
 
     questions_data = []
     for q in survey_obj.questions:
@@ -139,9 +157,18 @@ def fetch_questions():
             "options": []
         }
 
-        # Handle multiple choice options if stored in allowed_types
-        if q.qtype == "Multiple Choice" and q.allowed_types:
-            q_info["options"] = q.allowed_types.split(",")
+        # If stored allowed_types, try to load JSON first
+        if q.allowed_types:
+            try:
+                opts = json.loads(q.allowed_types)
+                if isinstance(opts, list):
+                    q_info["options"] = opts
+                else:
+                    # fallback: string -> single option
+                    q_info["options"] = [str(opts)]
+            except Exception:
+                # backward compatibility: comma-split if it wasn't JSON
+                q_info["options"] = [opt.strip() for opt in q.allowed_types.split(",") if opt.strip()]
 
         questions_data.append(q_info)
 
@@ -153,6 +180,7 @@ def fetch_questions():
         },
         "questions": questions_data
     }), 200
+
 
 
 @survey.route('/submit/<int:survey_id>', methods=['POST'])
