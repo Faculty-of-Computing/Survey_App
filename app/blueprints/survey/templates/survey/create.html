@@ -1,7 +1,7 @@
 {% extends 'base.html' %} {% block title %}Create Survey{% endblock %} {% block
 content %}
 <!-- Header -->
-<div class="w-full border-b border-gray-300 bg-white">
+<div class="w-full border-b border-gray-300 bg-white shadow-lg">
   <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
     <div class="flex items-center space-x-5">
       <a
@@ -24,7 +24,7 @@ content %}
 </div>
 <div class="max-w-4xl mx-auto p-6">
   <!-- Survey Info -->
-  <div class="bg-white p-6 rounded shadow mb-6">
+  <div class="bg-white p-6 rounded shadow-lg mb-6">
     <h2 class="text-lg font-semibold mb-1">Survey Information</h2>
     <form id="survey-info-form">
       <label class="block mb-4">
@@ -59,9 +59,9 @@ content %}
   </div>
   <!-- Questions Section -->
 
-  <div class="bg-white rounded shadow mb-6">
+  <div class="bg-white rounded shadow-lg mb-6">
     <div
-      class="flex sticky top-0 z-50 bg-white justify-between items-center border-b border-gray-200 px-6 py-4"
+      class="flex sticky top-0 z-50 bg-white shadow-sm justify-between items-center border-b border-gray-200 px-6 py-4"
     >
       <h2 class="text-md font-semibold">Questions</h2>
       <button
@@ -176,7 +176,7 @@ content %}
     function addNewQuestion() {
       const blk = document.createElement("div");
       blk.className =
-        "question-block border border-gray-300 p-4 rounded-md mb-5";
+        "question-block border border-gray-300 p-4 rounded-md mb-5 shadow-lg";
       blk.innerHTML = `
         <div class='flex justify-between items-center mb-3'>
           <h3 class='question-number text-lg font-medium'>Question</h3>

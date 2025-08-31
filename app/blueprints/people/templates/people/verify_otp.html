@@ -17,9 +17,9 @@ content%}
 
     <!-- Toggle Tabs -->
     <div
-      class="flex justify-center items-center bg-gray-200 rounded-full py-1 text-sm"
+      class="flex justify-center items-center bg-gray-200 rounded-md py-2 text-xl"
     >
-      <div class="text-blue-200">OTP Sent Successfully!</div>
+      <div class="text-black">OTP Sent Successfully!</div>
     </div>
 
     <!-- Form -->
@@ -50,10 +50,10 @@ content%}
           data-url="{{ url_for('auth.resend_otp') }}"
           id="resendOtpButton"
           type="button"
-          class="py-2 bg-black text-white rounded-md hover:bg-gray-900 transition hover:shadow-sm"
+          class="p-2 bg-black text-white rounded-md hover:bg-gray-900 transition hover:shadow-sm"
         >
           <span
-            class="text-sm text-blue-500 hover:underline cursor-pointer"
+            class="text-sm hover:underline cursor-pointer"
             id="countdownSpan"
           >
             Resend OTP
@@ -61,7 +61,7 @@ content%}
         </button>
         <button
           type="submit"
-          class="py-2 bg-black text-white rounded-md hover:bg-gray-900 transition hover:shadow-sm"
+          class="p-2 bg-black text-white rounded-md hover:bg-gray-900 transition hover:shadow-sm"
           id="submitButton"
         >
           Done
@@ -75,11 +75,15 @@ content%}
 
 <script>
   const resendOtpButton = document.getElementById("resendOtpButton");
-  let duration = {{ remaining_time | tojson }}; // ← passed from Flask
+  let duration = {{ remaining_time | tojson }}; // from Flask
   const countdownElement = document.getElementById("countdownSpan");
+  let timer = null; // keep reference to clear later
 
+  //Countdown Logic
   function startCountdown() {
-    const timer = setInterval(() => {
+    if (timer) clearInterval(timer); // clear any old timer
+
+    timer = setInterval(() => {
       const minutes = Math.floor(duration / 60);
       const seconds = duration % 60;
 
@@ -89,7 +93,7 @@ content%}
 
       if (--duration < 0) {
         clearInterval(timer);
-        countdownElement.textContent = "";
+        countdownElement.textContent = "Resend OTP";
         resendOtpButton.disabled = false;
       } else {
         resendOtpButton.disabled = true;
@@ -97,12 +101,32 @@ content%}
     }, 1000);
   }
 
+  //resendOtpButton Event Listener and Logic
   document.addEventListener("DOMContentLoaded", () => {
     resendOtpButton.disabled = duration > 0;
     if (duration > 0) {
       startCountdown();
     }
 
+    // ✅ Handle resend click
+    resendOtpButton.addEventListener("click", () => {
+      fetch(resendOtpButton.dataset.url, { method: "POST" }) // Flask route
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to resend OTP");
+          return res.json();
+        })
+        .then((data) => {
+          // Reset countdown for another 5 minutes
+          duration = 300; // 5 mins
+          startCountdown();
+        })
+        .catch((err) => {
+          console.error(err);
+          alert("Something went wrong while resending OTP!");
+        });
+    });
+
+    // OTP input validation
     const otpInput = document.getElementById("otpInput");
     otpInput.addEventListener("input", () => {
       if (otpInput.value.length === 6) {

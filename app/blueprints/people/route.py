@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for,session, jsonify
 import random
 import time
 from flask_mail import Message
@@ -56,7 +56,7 @@ def register():
                 print("Failed to send OTP email:", e)
                 error = "Failed to send OTP. Please try again later."
                 return render_template("people/register.html", error=error)
-        
+
     return render_template("people/register.html")
 
 
@@ -94,7 +94,7 @@ def verify_otp_form():
     if request.method == 'POST':
         user_otp = request.form.get('otp')
         temp_user = session.get('temp_user')
-        
+
 
         if not temp_user:
             flash("Session expired or invalid access.", "danger")
@@ -134,6 +134,7 @@ def verify_otp_form():
 def resend_otp():
     temp_user = session.get('temp_user')
     if not temp_user:
+        return jsonify({"success": False, "message": "Session expired or invalid access."}), 400
         flash("Session expired or invalid access.", "danger")
         return redirect(url_for('auth.register'))
 
@@ -147,11 +148,9 @@ def resend_otp():
     msg.body = f"Your new OTP is {new_otp}. It expires in 5 minutes."
     try:
         mail.send(msg)
-        flash("New OTP sent to your email.", "info")
+        return jsonify({"success": True, "message": "New OTP sent to your email."}), 200
     except Exception as e:
-        print("Failed to send OTP email:", e)
-        flash("Failed to send new OTP. Please try again later.", "danger")
-
-
-
-
+        import traceback
+        print("Failed to send OTP email:", str(e))
+        traceback.print_exc()   # 🔥 This will show the exact error in terminal
+        return jsonify({"success": False, "message": "Failed to send new OTP. Please try again later."}), 500

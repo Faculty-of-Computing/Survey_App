@@ -28,7 +28,7 @@ content %}
       class="flex justify-around items-center bg-gray-200 rounded-full py-1 text-sm"
     >
       <button
-        class="px-13 py-1 rounded-full hover:bg-white hover:shadow hover:border-gray-200 focus:bg-white focus:shadow focus:border-gray-200"
+        class="px-13 py-1 rounded-full hover:bg-white hover:shadow hover:border-gray-200 {% if request.endpoint == 'auth.login' %} bg-white shadow border border-gray-200 {% endif %}"
         id="loginButton"
         type="button"
         data-url="{{ url_for('auth.login') }}"
@@ -36,7 +36,7 @@ content %}
         Login
       </button>
       <button
-        class="px-14 py-1 rounded-full hover:bg-white hover:shadow hover:border-gray-200 focus:bg-white focus:shadow focus:border-gray-200"
+        class="px-14 py-1 rounded-full hover:bg-white hover:shadow hover:border-gray-200 {% if request.endpoint == 'auth.register' %} bg-white shadow border border-gray-200 {% endif %}"
         id="registerButton"
         type="button"
         data-url="{{ url_for('auth.register') }}"
