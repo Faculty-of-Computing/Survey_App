@@ -208,6 +208,7 @@ content %}
     }
 
     function collectData() {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
       const info = {
         title: document.getElementById("survey-title").value.trim(),
         description: document.getElementById("survey-description").value.trim(),
@@ -263,7 +264,10 @@ content %}
 
       fetch("/survey/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+          "X-CSRFToken": csrfToken,
+          "X-CSRF-Token": csrfToken },
         body: JSON.stringify({ info, questions: qs }),
       })
         .then((response) => {
