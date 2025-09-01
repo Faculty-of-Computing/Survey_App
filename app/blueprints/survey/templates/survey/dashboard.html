@@ -11,6 +11,7 @@ content %}
           <p class="text-gray-600">Welcome back, {{ username }}</p>
         </div>
         <form action="{{ url_for('auth.logout')}}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button
             type="submit"
             class="flex space-x-2 bg-gray-300 hover:bg-gray-500 px-2 items-center justify-center md:justify-between md:space-x-4 md:px-2 py-2 rounded-md hover:bg-gray-100 transition hover:shadow-sm"

@@ -55,6 +55,7 @@ content %}
       method="POST"
       action="{{ url_for('auth.register') }}"
     >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div>
         <label class="block text-sm font-medium text-gray-700">Email</label>
         <input

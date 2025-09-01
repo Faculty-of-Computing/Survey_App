@@ -28,7 +28,8 @@ content%}
       method="POST"
       action="{{ url_for('auth.verify_otp_form') }}"
     >
-      {% if error %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />{% if
+      error %}
       <div
         class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative text-sm mb-2"
         role="alert"
