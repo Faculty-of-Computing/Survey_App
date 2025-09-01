@@ -275,7 +275,7 @@ content %}
           return response.json();
         })
         .then((data) => {
-          alert("Survey " + data.survey_id + " saved");
+          // alert("Survey " + data.survey_id + " saved");
           window.location = data.redirect;
         })
         .catch((error) => {

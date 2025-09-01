@@ -1,15 +1,12 @@
 # routes.py
-import os
 import json
-from flask import Blueprint, render_template, request, url_for , abort, jsonify
+from flask import Blueprint, render_template, request, url_for, abort, jsonify, flash, redirect
 from flask_login import login_required, current_user
 from .models import db, Survey, Question, Answer, Response
-# from app.blueprints.people.models import User
+from app.blueprints.survey.utils import upload_to_cloudinary
 import re
 
 survey = Blueprint('survey', __name__, template_folder='templates', url_prefix='/survey')
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @survey.route('/dashboard')
@@ -34,27 +31,50 @@ def dashboard():
         total_responses=total_responses
     )
 
+
+@survey.route('/publish', methods=['POST'])
+@login_required
+def publish_survey():
+    try:
+        data = request.get_json() or {}
+        survey_id = data.get('survey_id')
+        
+        if not survey_id:
+            return jsonify({'success': False, 'error': 'Survey ID required'}), 400
+        
+        survey_obj = Survey.query.filter_by(id=survey_id, user_id=current_user.uid).first()
+        if not survey_obj:
+            return jsonify({'success': False, 'error': 'Survey not found'}), 404
+        
+        if survey_obj.publish:
+            return jsonify({'success': False, 'error': 'Survey already published'}), 400
+        
+        survey_obj.publish = True
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Survey published successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+
 @survey.route('/create', methods=['GET'])
 @login_required
 def create():
     return render_template('survey/create.html')
+
 
 @survey.route('/save', methods=['POST'])
 @login_required
 def save_survey():
     """
     Receives JSON payload from frontend, validates, and stores Survey + Questions.
-    Expected JSON:
-    {
-      "info": {"title":"...","description":"...","publish":true},
-      "questions": [{...}, ...]
-    }
     """
     data = request.get_json() or {}
     info = data.get('info', {})
     questions = data.get('questions', [])
 
-    # Validate survey info
     title = info.get('title', '').strip()
     if not title or len(title) > 255:
         abort(400, 'Title is required (≤255 chars)')
@@ -65,7 +85,6 @@ def save_survey():
 
     publish = bool(info.get('publish', False))
 
-    # Validate questions
     if not isinstance(questions, list) or len(questions) == 0:
         abort(400, 'At least one question required')
 
@@ -82,7 +101,6 @@ def save_survey():
         allowed = None
         max_mb = None
 
-        # File Upload: validate extensions and max size
         if qtype == 'File Upload':
             allowed_list = [ft.strip() for ft in q.get('allowed_types', []) if ft.strip()]
             if not all(file_type_pattern.match(ft) for ft in allowed_list):
@@ -92,18 +110,13 @@ def save_survey():
             if not isinstance(max_mb, int) or max_mb < 1 or max_mb > 100:
                 abort(400, f'Question {idx}: max_size_mb must be 1–100')
 
-            # store JSON string of allowed extensions
             allowed = json.dumps(allowed_list)
 
-        # Multiple Choice (and similar types that carry options)
         elif qtype in ('Multiple Choice', 'Checkboxes', 'Multiple Selection'):
             opts = [str(opt).strip() for opt in q.get('allowed_types', []) if str(opt).strip()]
             if len(opts) == 0:
                 abort(400, f'Question {idx}: multiple-choice questions require at least one option')
-            # store JSON string of options
             allowed = json.dumps(opts)
-
-        # otherwise allowed remains None
 
         q_objs.append(Question(
             text=text,
@@ -113,25 +126,21 @@ def save_survey():
             max_size_mb=max_mb
         ))
 
-
-    # Save survey
     survey_obj = Survey(title=title, description=description, publish=publish, user_id=current_user.uid)
     db.session.add(survey_obj)
-    db.session.flush()  # assign id
+    db.session.flush()
 
-    # Save questions
     for qobj in q_objs:
         qobj.survey_id = survey_obj.id
         db.session.add(qobj)
 
     db.session.commit()
-    #jsonify({'status': 'success', 'survey_id': survey_obj.id}), 201
     return jsonify({
         'status': 'success',
         'survey_id': survey_obj.id,
         'redirect': url_for('survey.dashboard')
     }), 201
-    
+
 
 @survey.route('/fetch-questions', methods=['POST'])
 @login_required
@@ -143,7 +152,6 @@ def fetch_questions():
     if not survey_obj:
         return jsonify({"error": "Survey not found"}), 404
 
-    # Allow owner or allow if survey is published
     if survey_obj.user_id != current_user.uid and not survey_obj.publish:
         return jsonify({"error": "Survey not available"}), 403
 
@@ -157,17 +165,14 @@ def fetch_questions():
             "options": []
         }
 
-        # If stored allowed_types, try to load JSON first
         if q.allowed_types:
             try:
                 opts = json.loads(q.allowed_types)
                 if isinstance(opts, list):
                     q_info["options"] = opts
                 else:
-                    # fallback: string -> single option
                     q_info["options"] = [str(opts)]
             except Exception:
-                # backward compatibility: comma-split if it wasn't JSON
                 q_info["options"] = [opt.strip() for opt in q.allowed_types.split(",") if opt.strip()]
 
         questions_data.append(q_info)
@@ -182,16 +187,13 @@ def fetch_questions():
     }), 200
 
 
-
 @survey.route('/submit/<int:survey_id>', methods=['POST'])
-@login_required
 def submit_survey(survey_id):
     survey_obj = Survey.query.get_or_404(survey_id)
 
-    # Create a new Response entry
-    new_response = Response(survey_id=survey_id, user_id=current_user.uid)
+    new_response = Response(survey_id=survey_id, user_id=current_user.uid if current_user.is_authenticated else None)
     db.session.add(new_response)
-    db.session.flush()  # Get ID before adding answers
+    db.session.flush()
 
     for question in survey_obj.questions:
         field_name = f"q{question.id}"
@@ -200,25 +202,11 @@ def submit_survey(survey_id):
         if question.qtype == "File Upload":
             file = request.files.get(field_name)
             if file and file.filename:
-                # Validate file type
-                if question.allowed_types:
-                    allowed_exts = [ext.lower() for ext in question.allowed_types.split(",")]
-                    file_ext = os.path.splitext(file.filename)[1].lower()
-                    if file_ext not in allowed_exts:
-                        abort(400, f"Invalid file type for question '{question.text}'")
-
-                # Validate file size
-                if question.max_size_mb:
-                    file.seek(0, os.SEEK_END)
-                    size_mb = file.tell() / (1024 * 1024)
-                    file.seek(0)
-                    if size_mb > question.max_size_mb:
-                        abort(400, f"File too large for question '{question.text}' (max {question.max_size_mb} MB)")
-
-                # Save file
-                save_path = os.path.join(UPLOAD_FOLDER, file.filename)
-                file.save(save_path)
-                answer_data["file_path"] = file.filename
+                # Upload to Cloudinary
+                url = upload_to_cloudinary(file, folder="survey_files")
+                if not url:
+                    abort(500, f"Failed to upload file for '{question.text}'")
+                answer_data["file_path"] = url
 
         elif question.qtype == "Text Response":
             answer_data["answer_text"] = request.form.get(field_name, "").strip()
@@ -263,10 +251,8 @@ def submit_survey(survey_id):
             answer_data["answer_text"] = date_val
 
         else:
-            # Default to text capture for unsupported types
             answer_data["answer_text"] = request.form.get(field_name, "").strip()
 
-        # Save answer
         answer_entry = Answer(
             response_id=new_response.id,
             question_id=question.id,
@@ -275,4 +261,72 @@ def submit_survey(survey_id):
         db.session.add(answer_entry)
 
     db.session.commit()
-    return jsonify({"status": "success", "message": "Responses saved"}), 200
+    return render_template("survey/thanks.html", survey=survey)
+
+
+@survey.route("/share/<int:survey_id>")
+@login_required
+def share_survey(survey_id):
+    s = Survey.query.get_or_404(survey_id)
+    if not s.publish:
+        abort(403, "Survey not published")
+    link = url_for("survey.respond", survey_id=s.id, _external=True)
+    return jsonify({"link": link})
+
+
+@survey.route("/respond/<int:survey_id>", methods=["GET"])
+def respond(survey_id):
+    survey = Survey.query.get_or_404(survey_id)
+
+    # Build questions list with parsed options (so template can use q.options)
+    questions = []
+    for q in survey.questions:
+        opts = []
+        if q.allowed_types:
+            try:
+                opts = json.loads(q.allowed_types)
+            except Exception:
+                # fallback if stored as comma-separated string
+                opts = [opt.strip() for opt in q.allowed_types.split(",") if opt.strip()]
+        # attach parsed options to object for template convenience
+        q.options = opts
+        questions.append(q)
+
+    return render_template("survey/response.html", survey=survey, questions=questions)
+
+
+# @survey.route("/thanks/<int:survey_id>")
+# def thanks(survey_id):
+#     survey = Survey.query.get_or_404(survey_id)
+#     return render_template("thanks.html", survey=survey)
+
+
+@survey.route("/results/<int:survey_id>")
+def results(survey_id):
+    survey = Survey.query.get_or_404(survey_id)
+    responses = Response.query.filter_by(survey_id=survey_id).all()
+    grouped = {}
+
+    for r in responses:
+        platform = r.platform or "Unknown"
+        parsed_answers = []
+        for ans in r.answers:
+            opts = []
+            if ans.question.allowed_types:
+                try:
+                    opts = json.loads(ans.question.allowed_types)
+                except Exception:
+                    opts = []
+            parsed_answers.append({
+                "question": ans.question,
+                "answer_text": ans.answer_text,
+                "answer_number": ans.answer_number,
+                "file_path": ans.file_path,
+                "options": opts  
+            })
+        grouped.setdefault(platform, []).append({
+            "submitted_at": r.submitted_at,
+            "answers": parsed_answers
+        })
+
+    return render_template("survey/result.html", survey=survey, grouped=grouped)

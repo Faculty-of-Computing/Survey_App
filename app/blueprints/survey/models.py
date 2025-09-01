@@ -9,6 +9,7 @@ class Survey(db.Model):
     description = db.Column(db.Text, nullable=True)
     publish = db.Column(db.Boolean, default=False)
     response = db.Column(db.Text, nullable=True) 
+    
         # new timestamp columns:
     created_at  = db.Column(
         db.DateTime,
@@ -50,6 +51,7 @@ class Response(db.Model):
     survey_id = db.Column(db.Integer, db.ForeignKey("surveys.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), nullable=True)  # optional for anonymous
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    platform = db.Column(db.String(255), nullable=True)
 
     survey = db.relationship("Survey", backref=db.backref("responses", lazy=True))
     answers = db.relationship("Answer", backref="response", cascade="all, delete-orphan")

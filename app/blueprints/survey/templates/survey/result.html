@@ -1,0 +1,161 @@
+{# templates/survey/result.html #} {% extends 'base.html' %} {% block title
+%}Survey Results{% endblock %} {% block content %}
+<div class="flex flex-col mx-auto p-6 bg-white rounded-lg shadow-xl max-w-4xl">
+  <h2 class="text-3xl font-bold text-center mb-4">
+    Results — {{ survey.title }}
+  </h2>
+  {% if survey.description %}
+  <p class="text-center text-gray-600 mb-6">{{ survey.description }}</p>
+  {% endif %} {# Platform icon helper (using emojis for portability) #} {% set
+  platform_icon = { "Facebook":"📘", "Twitter":"🐦", "LinkedIn":"🔗",
+  "WhatsApp":"💬", "Instagram":"📸", "Chrome":"🌐", "Firefox":"🦊",
+  "Safari":"🧭", "Android Browser":"🤖", "iOS Browser":"📱", "Unknown":"❓" } %}
+  {% for platform, responses in grouped.items() %}
+  <section class="mb-8">
+    <header class="flex items-center gap-3 mb-4">
+      <div class="text-2xl">{{ platform_icon.get(platform, "❓") }}</div>
+      <h3 class="text-2xl font-semibold">{{ platform }}</h3>
+      <span class="ml-3 text-sm text-gray-500"
+        >({{ responses|length }} response{{ 's' if responses|length != 1
+        }})</span
+      >
+    </header>
+
+    {% for r in responses %}
+    <article
+      class="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-6 shadow-sm"
+    >
+      <div class="flex justify-between items-start mb-4">
+        <div class="text-sm text-gray-500">
+          🕒 Submitted at {% if r.submitted_at %} {{
+          r.submitted_at.strftime('%Y-%m-%d %H:%M') }} {% else %} Unknown {%
+          endif %}
+        </div>
+        <div class="text-sm text-gray-500">
+          Platform: <span class="font-medium">{{ platform }}</span>
+        </div>
+      </div>
+
+      {% for ans in r.answers %}
+      <div class="mb-4">
+        <div class="font-semibold text-gray-700 mb-2">
+          {{ ans.question.text }}
+        </div>
+
+        {# File upload: show image preview for images, link for other types #}
+        {% if ans.file_path %} {% set fp = ans.file_path|string %}
+        <div
+          class="mb-2 border-1 shadow-xl inset-shadow-xs border-gray-300 rounded p-2 bg-rose-50"
+        >
+          {# simple check for common image extensions #} {% if ('.png' in
+          fp.lower()) or ('.jpg' in fp.lower()) or ('.jpeg' in fp.lower()) or
+          ('.gif' in fp.lower()) or ('.webp' in fp.lower()) %}
+          <a href="{{ fp }}" target="_blank" class="block">
+            <img
+              src="{{ fp }}"
+              alt="uploaded image"
+              class="max-h-64 rounded shadow mb-2"
+            />
+          </a>
+          <div>
+            <a
+              href="{{ fp }}"
+              target="_blank"
+              class="text-blue-600 underline text-sm"
+              >Open full image</a
+            >
+          </div>
+          {% else %}
+          <a href="{{ fp }}" target="_blank" class="text-blue-600 underline"
+            >Download / View file</a
+          >
+          {% endif %}
+        </div>
+
+        {# Multiple Choice / Checkboxes #} {% elif ans.options %}
+        <div
+          class="flex flex-wrap gap-2 mt-1 mb-2 border-1 shadow-xl inset-shadow-xs border-gray-300 rounded p-2 bg-rose-50"
+        >
+          {# highlight selected options #} {# chosen can be comma-separated for
+          multiple selections #} {# normalize for safety #} {% set chosen =
+          (ans.answer_text or '') %} {% for opt in ans.options %} {# normalize
+          for comma-separated choices #} {% set is_selected = False %} {% if
+          chosen %} {% if ',' in chosen %} {% set sel_list = chosen.split(',') |
+          map('trim') | list %} {% set is_selected = opt in sel_list %} {% else
+          %} {% set is_selected = (opt == chosen) %} {% endif %} {% endif %} {%
+          if is_selected %}
+          <span
+            class="px-3 py-1 rounded-full bg-green-100 text-green-800 border border-green-300"
+          >
+            {{ opt }}
+          </span>
+          {% else %}
+          <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 border">
+            {{ opt }}
+          </span>
+          {% endif %} {% endfor %}
+        </div>
+
+        {# Rating 1-5 #} {% elif ans.question.qtype == "Rating (1–5)" or
+        (ans.answer_number is not none and ans.question.qtype == "Rating (1–5)")
+        %} {% if ans.answer_number is not none %} {% set rating =
+        ans.answer_number|int %}
+        <div
+          class="flex items-center gap-2 mb-2 border-1 shadow-xl inset-shadow-xs border-gray-300 rounded p-2 bg-rose-50"
+        >
+          <div class="text-yellow-500 text-lg">
+            {# simple star visualization #} {% for i in range(1,6) %} {% if i <=
+            rating %} ★ {% else %} ☆ {% endif %} {% endfor %}
+          </div>
+          <div class="text-sm text-gray-700 font-medium">{{ rating }}/5</div>
+        </div>
+        {% else %}
+        <div class="text-sm text-gray-500">No rating</div>
+        {% endif %} {# Slider / Range #} {% elif ans.question.qtype ==
+        "Slider/Range" %} {% if ans.answer_number is not none %} {% set pct =
+        (ans.answer_number|float) %}
+        <div
+          class="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-2 border-1 shadow-xl inset-shadow-xs border-gray-300 rounded p-2 bg-rose-50"
+        >
+          <div
+            class="h-3 rounded-full bg-green-500"
+            style="width: {{ pct }}%;"
+          ></div>
+        </div>
+        <div class="text-sm text-gray-600 mt-1">{{ pct|round(1) }}%</div>
+        {% else %}
+        <div class="text-sm text-gray-500">No value selected</div>
+        {% endif %} {# Text response or fallback #} {% else %}
+        <div
+          class="text-gray-900 mb-2 border-1 shadow-xl inset-shadow-xl border-gray-300 rounded p-2 bg-rose-50"
+        >
+          {% if ans.answer_text %} {{ ans.answer_text }} {% elif
+          ans.answer_number is not none %} {{ ans.answer_number }} {% else %}
+          <span class="text-gray-500">—</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </article>
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+  <div class="flex justify-center mt-6">
+    <a
+      href="{{ url_for('survey.dashboard') }}"
+      class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded"
+    >
+      Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %} {% block js %}
+<script>
+  // small helper: nothing heavy here; leave for future enhancements
+  document.addEventListener("DOMContentLoaded", () => {
+    // noop
+  });
+</script>
+{% endblock %}

@@ -1,1 +1,273 @@
-{% extends 'base.html' %} 1
+{% extends 'base.html' %} {% block title %}Respond to Survey{% endblock %} {%
+block content %}
+<div class="flex flex-col mx-auto p-6 bg-white rounded-lg shadow-xl max-w-3xl">
+  <h2 class="text-4xl font-bold text-center mb-4">{{ survey.title }}</h2>
+  {% if survey.description %}
+  <p class="text-center mb-4 text-gray-600">{{ survey.description }}</p>
+  {% endif %}
+
+  <form
+    id="survey-form"
+    enctype="multipart/form-data"
+    action="{{ url_for('survey.submit_survey', survey_id=survey.id) }}"
+    method="POST"
+    class="space-y-4 flex flex-col"
+  >
+    {# CSRF token if available from context processor #} {% if csrf_token %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    {% endif %} {# ... earlier markup unchanged ... #} {% for q in questions %}
+    <div
+      class="bg-gray-50 shadow-lg border border-gray-200 rounded-lg p-4 flex flex-col gap-2 my-10"
+      data-qid="{{ q.id }}"
+    >
+      <label class="font-bold text-gray-700">{{ q.text }}</label>
+
+      {# normalize type to be safe #} {% set t = (q.qtype or '') | lower %} {#
+      Text Response #} {% if 'text' in t and 'response' in t %}
+      <input
+        type="text"
+        name="q{{ q.id }}"
+        class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+        {%
+        if
+        q.required
+        %}
+        required
+        {%
+        endif
+        %}
+      />
+
+      {# Multiple Choice (radio) #} {% elif 'multiple' in t and 'choice' in t or
+      'single' in t and 'choice' in t %}
+      <div class="flex flex-col gap-2">
+        {% for opt in q.options %}
+        <label class="flex items-center gap-2">
+          <input
+            type="radio"
+            name="q{{ q.id }}"
+            value="{{ opt }}"
+            class="text-green-500 focus:ring-green-400"
+            {%
+            if
+            q.required
+            %}
+            required
+            {%
+            endif
+            %}
+          />
+          <span>{{ opt }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {# Checkboxes / Multiple Selection #} {% elif 'checkbox' in t or 'multiple
+      selection' in t or 'multiple' in t and 'select' in t %}
+      <div class="flex flex-col gap-2">
+        {% for opt in q.options %}
+        <label class="flex items-center gap-2">
+          {# NOTE: using same name (no []); server uses
+          request.form.getlist(field_name) #}
+          <input
+            type="checkbox"
+            name="q{{ q.id }}"
+            value="{{ opt }}"
+            class="text-green-500 focus:ring-green-400"
+          />
+          <span>{{ opt }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {# Rating (1–5) #} {% elif 'rating' in t or '1–5' in t or '1-5' in t %}
+      <div class="flex gap-4">
+        {% for num in range(1,6) %}
+        <label class="flex items-center gap-1">
+          <input
+            type="radio"
+            name="q{{ q.id }}"
+            value="{{ num }}"
+            class="text-green-500 focus:ring-green-400"
+            {%
+            if
+            q.required
+            %}
+            required
+            {%
+            endif
+            %}
+          />
+          <span>{{ num }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {# Slider / Range #} {% elif 'slider' in t or 'range' in t %}
+      <div class="flex flex-col gap-2">
+        <input
+          type="range"
+          name="q{{ q.id }}"
+          min="0"
+          max="100"
+          value="50"
+          class="w-full accent-green-500"
+          {%
+          if
+          q.required
+          %}
+          required
+          {%
+          endif
+          %}
+          oninput="document.getElementById('sliderVal{{ q.id }}').textContent = this.value + '%'"
+        />
+        <div class="text-sm text-gray-600">
+          Value: <span id="sliderVal{{ q.id }}">50%</span>
+        </div>
+      </div>
+
+      {# File Upload #} {% elif 'file' in t or 'upload' in t %} {% set
+      accept_str = (q.options | map('string') | join(',')) if q.options else ''
+      %}
+      <div class="flex flex-col gap-2">
+        <input
+          type="file"
+          name="q{{ q.id }}"
+          id="fileInput{{ q.id }}"
+          class="w-full"
+          {%
+          if
+          q.required
+          %}
+          required
+          {%
+          endif
+          %}
+          {%
+          if
+          accept_str
+          %}
+          accept="{{ accept_str }}"
+          {%
+          endif
+          %}
+        />
+        <div id="filePreview{{ q.id }}" class="mt-2"></div>
+        <div class="text-xs text-gray-500">Max file size: 10 MB</div>
+      </div>
+
+      {# Fallback (text) #} {% else %}
+      <input
+        type="text"
+        name="q{{ q.id }}"
+        {%
+        if
+        q.required
+        %}
+        required
+        {%
+        endif
+        %}
+      />
+      {% endif %}
+    </div>
+    {% endfor %} {# ... rest unchanged ... #}
+
+    <!-- Hidden platform input (filled by JS) -->
+    <input type="hidden" name="platform" id="platformInput" value="Unknown" />
+
+    <!-- Buttons -->
+    <div class="flex gap-8 flex-wrap justify-center mt-4">
+      <button
+        type="submit"
+        id="submitBtn"
+        class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded w-full sm:w-auto"
+      >
+        Submit
+      </button>
+      <a
+        href="{{ url_for('survey.dashboard') }}"
+        class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded w-full sm:w-auto text-center"
+      >
+        Back to Dashboard
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %} {% block js %}
+<script>
+  // Platform detection (fills hidden input)
+  function detectPlatform() {
+    let platform = "Unknown";
+    const ua = navigator.userAgent.toLowerCase();
+    const ref = document.referrer.toLowerCase();
+
+    if (ref.includes("facebook")) platform = "Facebook";
+    else if (ref.includes("twitter")) platform = "Twitter";
+    else if (ref.includes("linkedin")) platform = "LinkedIn";
+    else if (ref.includes("instagram")) platform = "Instagram";
+    else if (ref.includes("whatsapp")) platform = "WhatsApp";
+    else if (ua.includes("android")) platform = "Android Browser";
+    else if (ua.includes("iphone") || ua.includes("ipad"))
+      platform = "iOS Browser";
+    else if (ua.includes("firefox")) platform = "Firefox";
+    else if (ua.includes("chrome")) platform = "Chrome";
+    else if (ua.includes("safari")) platform = "Safari";
+
+    const input = document.getElementById("platformInput");
+    if (input) input.value = platform;
+  }
+
+  // Client-side file size check and image preview
+  function setupFileInputs() {
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+    document.querySelectorAll('input[type="file"]').forEach((input) => {
+      input.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        const id = input.id.replace("fileInput", "");
+        const previewDiv = document.getElementById("filePreview" + id);
+        previewDiv.innerHTML = "";
+
+        if (!file) return;
+
+        if (file.size > MAX_BYTES) {
+          alert("File too large. Maximum allowed size is 10 MB.");
+          input.value = "";
+          return;
+        }
+
+        // Show a preview for images
+        if (file.type.startsWith("image/")) {
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(file);
+          img.alt = "preview";
+          img.className = "mt-2 max-h-48 rounded shadow";
+          previewDiv.appendChild(img);
+        } else {
+          const p = document.createElement("div");
+          p.textContent = `Selected file: ${file.name} (${Math.round(
+            file.size / 1024
+          )} KB)`;
+          p.className = "text-sm text-gray-700";
+          previewDiv.appendChild(p);
+        }
+      });
+    });
+  }
+
+  // Prevent double submit while upload is in progress (simple UX)
+  document.addEventListener("DOMContentLoaded", () => {
+    detectPlatform();
+    setupFileInputs();
+
+    const form = document.getElementById("survey-form");
+    form.addEventListener("submit", () => {
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "Submitting...";
+    });
+  });
+</script>
+{% endblock %}
