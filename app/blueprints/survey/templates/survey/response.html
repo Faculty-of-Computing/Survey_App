@@ -154,7 +154,9 @@ block content %}
           %}
         />
         <div id="filePreview{{ q.id }}" class="mt-2"></div>
-        <div class="text-xs text-gray-500">Max file size: 10 MB</div>
+        <div class="text-xs text-gray-500">
+          Max file size: {{ q.max_size_mb }} MB
+        </div>
       </div>
 
       {# Fallback (text) #} {% else %}

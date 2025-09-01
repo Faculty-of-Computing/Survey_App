@@ -3,7 +3,7 @@ content %}
 <!-- Header -->
 <div class="w-full border-b border-gray-300 bg-white shadow-lg">
   <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-    <div class="flex items-center space-x-5">
+    <div class="flex items-center md:space-x-5">
       <a
         href="{{ url_for('survey.dashboard') }}"
         class="text-sm text-black hover:bg-black hover:text-white px-3 py-2 rounded"
@@ -11,12 +11,14 @@ content %}
       >
       <div>
         <h1 class="text-lg font-semibold">Create Survey</h1>
-        <p class="text-sm text-gray-500">Build your survey step by step</p>
+        <p class="text-xs text-wrap md:text-sm md:text-no-wrap text-gray-500">
+          Build your survey step by step
+        </p>
       </div>
     </div>
     <button
       id="save-survey-btn"
-      class="bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800"
+      class="bg-black text-white px-2 md:px-4 py-2 rounded-md hover:bg-gray-800"
     >
       Save Survey
     </button>
@@ -97,6 +99,9 @@ content %}
 </div>
 {% endblock %} {% block js %}
 <script>
+  const csrfToken =
+    document.querySelector('meta[name="csrf-token"]')?.content || "";
+
   document.addEventListener("DOMContentLoaded", () => {
     const container = document.getElementById("questions-container");
     const addBtns = document.querySelectorAll(
@@ -138,14 +143,14 @@ content %}
             const d = document.createElement("div");
             d.className = "file-config mt-4";
             d.innerHTML = `
-              <label class='block text-sm font-medium'>
-                Allowed File Types
-                <input name='file_types' type='text' class='w-full mt-1 border rounded px-3 py-2' placeholder='.jpg, .png'/>
-              </label>
-              <label class='block text-sm font-medium mt-2'>
-                Max File Size (MB)
-                <input name='max_size' type='number' class='w-full mt-1 border rounded px-3 py-2' placeholder='10'/>
-              </label>`;
+            <label class='block text-sm font-medium'>
+              Allowed File Types
+              <input name='file_types' type='text' class='w-full mt-1 border rounded px-3 py-2' placeholder='.jpg, .png'/>
+            </label>
+            <label class='block text-sm font-medium mt-2'>
+              Max File Size (MB)
+              <input name='max_size' type='number' class='w-full mt-1 border rounded px-3 py-2' placeholder='10'/>
+            </label>`;
             block.append(d);
           }
 
@@ -153,12 +158,12 @@ content %}
             const mcDiv = document.createElement("div");
             mcDiv.className = "multiple-choice-config mt-4";
             mcDiv.innerHTML = `
-              <label class='block text-sm font-medium'>Options</label>
-              <div class='options-list space-y-2 mt-2'></div>
-              <button type="button" class="add-option-btn bg-gray-200 px-2 py-1 rounded text-sm hover:bg-gray-300">
-                + Add Option
-              </button>
-            `;
+            <label class='block text-sm font-medium'>Options</label>
+            <div class='options-list space-y-2 mt-2'></div>
+            <button type="button" class="add-option-btn bg-gray-200 px-2 py-1 rounded text-sm hover:bg-gray-300">
+              + Add Option
+            </button>
+          `;
             block.append(mcDiv);
 
             const optionsList = mcDiv.querySelector(".options-list");
@@ -208,7 +213,6 @@ content %}
     }
 
     function collectData() {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
       const info = {
         title: document.getElementById("survey-title").value.trim(),
         description: document.getElementById("survey-description").value.trim(),
@@ -262,12 +266,18 @@ content %}
 
       if (hasError) return;
 
+      // Ensure we at least send an empty string header if token missing
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      if (csrfToken) {
+        headers["X-CSRFToken"] = csrfToken;
+        headers["X-CSRF-Token"] = csrfToken;
+      }
+
       fetch("/survey/save", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-          "X-CSRFToken": csrfToken,
-          "X-CSRF-Token": csrfToken },
+        headers,
         body: JSON.stringify({ info, questions: qs }),
       })
         .then((response) => {
@@ -279,7 +289,6 @@ content %}
           return response.json();
         })
         .then((data) => {
-          // alert("Survey " + data.survey_id + " saved");
           window.location = data.redirect;
         })
         .catch((error) => {

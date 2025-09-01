@@ -4,7 +4,7 @@ content %}
   <div class="container mx-auto p-6">
     <header class="w-full mb-6 border-b-gray-500-2 shadow-xl pb-4 px-4">
       <div
-        class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center"
+        class="max-w-7xl mx-auto space-x-2 md:space-x-0 md:px-6 py-4 flex justify-between items-center"
       >
         <div>
           <h1 class="text-xl font-semibold">Survey Platform</h1>
@@ -13,7 +13,7 @@ content %}
         <form action="{{ url_for('auth.logout')}}" method="POST">
           <button
             type="submit"
-            class="flex items-center justify-center md:justify-between md:space-x-4 md:px-2 py-2 rounded-md hover:bg-gray-100 transition hover:shadow-sm"
+            class="flex space-x-2 bg-gray-300 hover:bg-gray-500 px-2 items-center justify-center md:justify-between md:space-x-4 md:px-2 py-2 rounded-md hover:bg-gray-100 transition hover:shadow-sm"
           >
             <img
               src="{{ url_for('static', filename='assets/exit.png') }}"
