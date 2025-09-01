@@ -9,6 +9,38 @@ import re
 survey = Blueprint('survey', __name__, template_folder='templates', url_prefix='/survey')
 
 
+def parse_platform_from_ua(ua: str, ref: str = "") -> str:
+    ua = (ua or "").lower()
+    ref = (ref or "").lower()
+    if "fbav" in ua or "fban" in ua or "facebook" in ua or "m.facebook" in ref:
+        return "Facebook"
+    if "whatsapp" in ua or "whatsapp" in ref:
+        return "WhatsApp"
+    if "instagram" in ua or "instagram" in ref:
+        return "Instagram"
+    if "linkedin" in ua or "linkedin" in ref:
+        return "LinkedIn"
+    if "twitter" in ua or "x-ios" in ua or "tweet" in ref:
+        return "Twitter"
+    if "crios" in ua:
+        return "Chrome (iOS)"
+    if "edg" in ua or "edge" in ua:
+        return "Edge"
+    if "firefox" in ua:
+        return "Firefox"
+    if "chrome" in ua:
+        return "Chrome"
+    if "safari" in ua:
+        return "Safari"
+    if "iphone" in ua or "ipad" in ua:
+        return "iOS Browser"
+    if "android" in ua:
+        return "Android Browser"
+    return "Unknown"
+
+
+
+
 @survey.route('/dashboard')
 @login_required
 def dashboard():
@@ -192,6 +224,26 @@ def submit_survey(survey_id):
     survey_obj = Survey.query.get_or_404(survey_id)
 
     new_response = Response(survey_id=survey_id, user_id=current_user.uid if current_user.is_authenticated else None)
+
+    # capture client-sent platform first
+    platform_from_form = request.form.get("platform")
+    # capture source query param (if user clicked a share link with ?source=)
+    platform_from_qs = request.args.get("source")
+    if platform_from_form:
+        platform = platform_from_form
+    elif platform_from_qs:
+        platform = platform_from_qs
+    else:
+        platform = parse_platform_from_ua(request.headers.get("User-Agent", ""), request.referrer)
+
+    new_response.platform = platform
+
+    db.session.add(new_response)
+    db.session.flush()
+    # ... continue saving answers ...
+
+    
+    
     db.session.add(new_response)
     db.session.flush()
 
@@ -261,7 +313,7 @@ def submit_survey(survey_id):
         db.session.add(answer_entry)
 
     db.session.commit()
-    return render_template("survey/thanks.html", survey=survey)
+    return render_template("survey/thanks.html", survey=survey_obj)
 
 
 @survey.route("/share/<int:survey_id>")

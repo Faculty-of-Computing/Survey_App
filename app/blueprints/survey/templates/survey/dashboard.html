@@ -2,7 +2,9 @@
 content %}
 <div class="bg-gray-50 min-h-screen font-sans">
   <div class="container mx-auto p-6">
-    <header class="w-full mb-6 border-b-gray-500-2 shadow-xl pb-4 px-4">
+    <header
+      class="w-full mb-6 border-b-gray-500-2 inset-shadow-sm/25 shadow-xl pb-4 px-4"
+    >
       <div
         class="max-w-7xl mx-auto space-x-2 md:space-x-0 md:px-6 py-4 flex justify-between items-center"
       >
@@ -26,13 +28,10 @@ content %}
         </form>
       </div>
     </header>
-    <!-- Header -->
-
-    <!-- Stats Cards -->
 
     <div class="max-w-7xl mx-auto p-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-lg p-4 shadow-lg">
+        <div class="bg-white rounded-lg p-4 inset-shadow-sm/10 shadow-lg">
           <div class="flex items-center justify-between">
             <h2 class="text-gray-500">Total Surveys</h2>
             <img
@@ -41,10 +40,9 @@ content %}
               class="h-6 w-6"
             />
           </div>
-
           <p class="text-2xl font-bold">{{ total_surveys }}</p>
         </div>
-        <div class="bg-white rounded-lg p-4 shadow-lg">
+        <div class="bg-white rounded-lg p-4 inset-shadow-sm/10 shadow-lg">
           <div class="flex items-center justify-between">
             <h2 class="text-gray-500">Total Responses</h2>
             <img
@@ -53,10 +51,9 @@ content %}
               class="h-6 w-6"
             />
           </div>
-
           <p class="text-2xl font-bold">{{ total_responses }}</p>
         </div>
-        <div class="bg-white rounded-lg p-4 shadow-lg">
+        <div class="bg-white rounded-lg p-4 inset-shadow-sm/10 shadow-lg">
           <div class="flex items-center justify-between">
             <h2 class="text-gray-500">Published Surveys</h2>
             <img
@@ -65,7 +62,6 @@ content %}
               class="h-6 w-6"
             />
           </div>
-
           <p class="text-2xl font-bold">{{ total_published }}</p>
         </div>
       </div>
@@ -132,6 +128,7 @@ content %}
                 </button>
                 {% endif %}
               </div>
+
               <p class="text-sm font-semibold text-gray-700 my-2">
                 {{ survey.description }}
               </p>
@@ -139,9 +136,7 @@ content %}
                 {{ survey.questions_length }} Question{{ 's' if
                 survey.questions_length != 1 }}
               </p>
-              <!-- <p class="text-sm text-gray-500">
-                Responses: {{ survey.responses|length }}
-              </p> -->
+
               <div class="flex justify-between align-center">
                 <p class="text-sm text-black">
                   Created by: {{ survey.user.username }}
@@ -150,37 +145,15 @@ content %}
                   at {{ survey.created_at.strftime('%Y-%m-%d %H:%M') }}
                 </p>
               </div>
+
               {% if survey.publish %}
               <div class="mt-4">
                 <button
-                  onclick="openShare('{{ url_for('survey.respond', survey_id=survey.id, _external=True) }}')"
+                  onclick="openShare('{{ url_for('survey.respond', survey_id=survey.id, _external=True) }}', this)"
                   class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-2xl shadow hover:bg-gray-700 transition"
                 >
                   <i data-lucide="share-2" class="w-4 h-4"></i> Share
                 </button>
-              </div>
-
-              <!-- Share Modal -->
-              <div
-                id="shareModal"
-                class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50"
-              >
-                <div class="bg-white p-6 rounded-2xl shadow-xl w-80">
-                  <h3 class="text-lg font-bold text-gray-800 mb-4 text-center">
-                    Share Survey
-                  </h3>
-
-                  <ul id="shareLinks" class="space-y-3">
-                    <!-- Links will be injected here -->
-                  </ul>
-
-                  <button
-                    onclick="closeShare()"
-                    class="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-2 transition"
-                  >
-                    Close
-                  </button>
-                </div>
               </div>
               {% endif %}
             </div>
@@ -202,7 +175,6 @@ content %}
               </p>
             </div>
 
-            <!-- NEW: button navigates to results page, shows response count, uses Lucide icon -->
             <button
               type="button"
               onclick="location.href='{{ url_for('survey.results', survey_id=survey.id) }}'"
@@ -224,63 +196,149 @@ content %}
     </div>
   </div>
 </div>
+
+<!-- SHARE MODAL (included in this template so openShare always has a target) -->
+<div
+  id="shareModal"
+  class="modal-backdrop hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50"
+  aria-hidden="true"
+  role="dialog"
+  aria-modal="true"
+>
+  <div class="bg-white p-6 rounded-2xl shadow-xl w-80">
+    <h3 class="text-lg font-bold text-gray-800 mb-4 text-center">
+      Share Survey
+    </h3>
+    <ul id="shareLinks" class="space-y-3"></ul>
+    <button
+      id="shareModalClose"
+      type="button"
+      class="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-2 transition"
+    >
+      Close
+    </button>
+  </div>
+</div>
 {% endblock %} {% block js %}
 <script>
-  function openShare(surveyUrl) {
-    const shareLinks = document.getElementById("shareLinks");
-    shareLinks.innerHTML = `
-    <li>
-      <a href="https://wa.me/?text=${encodeURIComponent(
-        surveyUrl
-      )}" target="_blank" 
-         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-100 hover:bg-green-200 transition">
-        <i data-lucide="message-circle" class="w-5 h-5 text-green-600"></i> WhatsApp
-      </a>
-    </li>
-    <li>
-      <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-        surveyUrl
-      )}" target="_blank" 
-         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 transition">
-        <i data-lucide="facebook" class="w-5 h-5 text-blue-700"></i> Facebook
-      </a>
-    </li>
-    <li>
-      <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(
-        surveyUrl
-      )}&text=Take this survey!" target="_blank" 
-         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-100 hover:bg-sky-200 transition">
-        <i data-lucide="twitter" class="w-5 h-5 text-sky-500"></i> Twitter (X)
-      </a>
-    </li>
-    <li>
-      <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-        surveyUrl
-      )}" target="_blank" 
-         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-100 hover:bg-indigo-200 transition">
-        <i data-lucide="linkedin" class="w-5 h-5 text-indigo-700"></i> LinkedIn
-      </a>
-    </li>
-    <li>
-      <button onclick="copyLink('${surveyUrl}')" 
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition">
-        <i data-lucide="copy" class="w-5 h-5 text-gray-700"></i> Copy Link
-      </button>
-    </li>
-  `;
+  // small helper to append source param
+  function addSourceParam(url, source) {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}source=${encodeURIComponent(source)}`;
+  }
 
-    document.getElementById("shareModal").classList.remove("hidden");
-    lucide.createIcons(); // re-render icons
+  // track last focused opener for a11y
+  let __lastFocusedBeforeShare = null;
+
+  // openShare(surveyUrl, openerButtonOpt)
+  // If openerButton passed, we'll restore focus to it on close.
+  function openShare(surveyUrl, openerBtn) {
+    // ensure modal markup exists on the page (we included it above)
+    const modal = document.getElementById("shareModal");
+    const shareLinks = document.getElementById("shareLinks");
+    const closeBtn = document.getElementById("shareModalClose");
+
+    if (!modal || !shareLinks || !closeBtn) {
+      console.error("Share modal is not present in the DOM.");
+      return;
+    }
+
+    __lastFocusedBeforeShare = openerBtn || document.activeElement;
+
+    const wa = addSourceParam(surveyUrl, "WhatsApp");
+    const fb = addSourceParam(surveyUrl, "Facebook");
+    const tw = addSourceParam(surveyUrl, "Twitter");
+    const li = addSourceParam(surveyUrl, "LinkedIn");
+
+    shareLinks.innerHTML = `
+      <li>
+        <a href="https://wa.me/?text=${encodeURIComponent(
+          wa
+        )}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-200 hover:bg-green-300 transition">
+          <i data-lucide="message-circle" class="w-5 h-5"></i> WhatsApp
+        </a>
+      </li>
+      <li>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+          fb
+        )}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-200 hover:bg-blue-300 transition">
+          <i data-lucide="facebook" class="w-5 h-5"></i> Facebook
+        </a>
+      </li>
+      <li>
+        <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(
+          tw
+        )}&text=Take this survey!" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-200 hover:bg-sky-300 transition">
+          <i data-lucide="twitter" class="w-5 h-5"></i> Twitter (X)
+        </a>
+      </li>
+      <li>
+        <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+          li
+        )}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-200 hover:bg-indigo-300 transition">
+          <i data-lucide="linkedin" class="w-5 h-5"></i> LinkedIn
+        </a>
+      </li>
+      <li>
+        <button type="button" onclick="copyLink('${surveyUrl}')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition">
+          <i data-lucide="copy" class="w-5 h-5"></i> Copy Link
+        </button>
+      </li>
+    `;
+
+    // show modal and update accessibility attributes BEFORE focusing
+    modal.setAttribute("aria-hidden", "false");
+    modal.classList.remove("hidden");
+    // force a reflow for transitions, then add visible class if you have CSS transitions
+    void modal.offsetWidth;
+    modal.classList.add("visible");
+
+    // render lucide icons for injected markup
+    if (typeof lucide !== "undefined" && lucide.createIcons) {
+      lucide.createIcons();
+    } else {
+      // lucide may load a bit later; once loaded, call createIcons
+      window.addEventListener(
+        "load",
+        () => {
+          if (typeof lucide !== "undefined" && lucide.createIcons)
+            lucide.createIcons();
+        },
+        { once: true }
+      );
+    }
+
+    // focus close button (after aria-hidden change to avoid the console warning)
+    setTimeout(() => {
+      try {
+        closeBtn.focus();
+      } catch (e) {}
+    }, 50);
   }
 
   function closeShare() {
-    document.getElementById("shareModal").classList.add("hidden");
+    const modal = document.getElementById("shareModal");
+    if (!modal) return;
+    modal.classList.remove("visible");
+    modal.setAttribute("aria-hidden", "true");
+    setTimeout(() => {
+      modal.classList.add("hidden");
+      // restore focus to previously focused element (if possible)
+      if (
+        __lastFocusedBeforeShare &&
+        typeof __lastFocusedBeforeShare.focus === "function"
+      ) {
+        try {
+          __lastFocusedBeforeShare.focus();
+        } catch (e) {}
+      }
+    }, 220);
   }
 
   function copyLink(url) {
-    navigator.clipboard.writeText(url).then(() => {
-      alert("✅ Survey link copied to clipboard!");
-    });
+    navigator.clipboard
+      .writeText(url)
+      .then(() => alert("✅ Survey link copied to clipboard!"));
   }
 
   function toggleTab(tab) {
@@ -291,58 +349,52 @@ content %}
       .getElementById("responses")
       .classList.toggle("hidden", tab !== "responses");
   }
-  // Publish functionality
-  document.addEventListener("DOMContentLoaded", function () {
-    console.log("DOM loaded - setting up publish buttons");
 
-    // Publish button event listeners
+  // hook up close button (safety: if markup exists)
+  document.addEventListener("DOMContentLoaded", () => {
+    const closeBtn = document.getElementById("shareModalClose");
+    if (closeBtn) closeBtn.addEventListener("click", closeShare);
+
+    // publish button handlers
     document.querySelectorAll(".publish-btn").forEach((btn) => {
       btn.addEventListener("click", async function () {
         const surveyId = this.dataset.surveyId;
-        const csrfToken = document.querySelector(
-          'meta[name="csrf-token"]'
-        )?.content;
-
-        if (confirm("Are you sure you want to publish this survey?")) {
-          try {
-            const response = await fetch(
-              '{{ url_for("survey.publish_survey") }}',
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-CSRFToken": csrfToken,
-                },
-                body: JSON.stringify({ survey_id: surveyId }),
-              }
+        if (!confirm("Are you sure you want to publish this survey?")) return;
+        try {
+          const csrfToken = document.querySelector(
+            'meta[name="csrf-token"]'
+          )?.content;
+          const resp = await fetch('{{ url_for("survey.publish_survey") }}', {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfToken || "",
+            },
+            body: JSON.stringify({ survey_id: surveyId }),
+          });
+          const result = await resp.json();
+          if (resp.ok && result.success) {
+            this.disabled = true;
+            alert("Survey published successfully!");
+            setTimeout(() => location.reload(), 800);
+          } else {
+            alert(
+              "Failed to publish survey: " + (result.error || "Unknown error")
             );
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-              this.disabled = true;
-              alert("Survey published successfully!");
-
-              // Optional: reload to update counts
-              setTimeout(() => {
-                location.reload();
-              }, 1000);
-            } else {
-              alert(
-                "Failed to publish survey: " + (result.error || "Unknown error")
-              );
-            }
-          } catch (error) {
-            console.error("Error:", error);
-            alert("Error publishing survey");
           }
+        } catch (err) {
+          console.error(err);
+          alert("Error publishing survey");
         }
       });
     });
+
+    // initial render of any static icons in the DOM
+    if (typeof lucide !== "undefined" && lucide.createIcons)
+      lucide.createIcons();
   });
 </script>
+
+<!-- Load Lucide only in this page (so base.html stays unchanged) -->
 <script src="https://unpkg.com/lucide@latest"></script>
-<script>
-  lucide.createIcons();
-</script>
 {% endblock %}

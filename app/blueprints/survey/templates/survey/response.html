@@ -15,7 +15,7 @@ block content %}
   >
     {# CSRF token if available from context processor #} {% if csrf_token %}
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    {% endif %} {# ... earlier markup unchanged ... #} {% for q in questions %}
+    {% endif %} {# Questions #} {% for q in questions %}
     <div
       class="bg-gray-50 shadow-lg border border-gray-200 rounded-lg p-4 flex flex-col gap-2 my-10"
       data-qid="{{ q.id }}"
@@ -38,8 +38,8 @@ block content %}
         %}
       />
 
-      {# Multiple Choice (radio) #} {% elif 'multiple' in t and 'choice' in t or
-      'single' in t and 'choice' in t %}
+      {# Multiple Choice (radio) #} {% elif ('multiple' in t and 'choice' in t)
+      or ('single' in t and 'choice' in t) %}
       <div class="flex flex-col gap-2">
         {% for opt in q.options %}
         <label class="flex items-center gap-2">
@@ -63,12 +63,11 @@ block content %}
       </div>
 
       {# Checkboxes / Multiple Selection #} {% elif 'checkbox' in t or 'multiple
-      selection' in t or 'multiple' in t and 'select' in t %}
+      selection' in t or ('multiple' in t and 'select' in t) %}
       <div class="flex flex-col gap-2">
         {% for opt in q.options %}
         <label class="flex items-center gap-2">
-          {# NOTE: using same name (no []); server uses
-          request.form.getlist(field_name) #}
+          {# server uses request.form.getlist(field_name) #}
           <input
             type="checkbox"
             name="q{{ q.id }}"
@@ -155,7 +154,7 @@ block content %}
         />
         <div id="filePreview{{ q.id }}" class="mt-2"></div>
         <div class="text-xs text-gray-500">
-          Max file size: {{ q.max_size_mb }} MB
+          Max file size: {{ q.max_size_mb or 10 }} MB
         </div>
       </div>
 
@@ -174,7 +173,7 @@ block content %}
       />
       {% endif %}
     </div>
-    {% endfor %} {# ... rest unchanged ... #}
+    {% endfor %}
 
     <!-- Hidden platform input (filled by JS) -->
     <input type="hidden" name="platform" id="platformInput" value="Unknown" />
@@ -188,43 +187,78 @@ block content %}
       >
         Submit
       </button>
+
+      {% if current_user.is_authenticated and current_user.uid == survey.user_id
+      %}
       <a
         href="{{ url_for('survey.dashboard') }}"
         class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded w-full sm:w-auto text-center"
       >
         Back to Dashboard
       </a>
+      {% endif %}
     </div>
   </form>
 </div>
 {% endblock %} {% block js %}
 <script>
-  // Platform detection (fills hidden input)
-  function detectPlatform() {
-    let platform = "Unknown";
-    const ua = navigator.userAgent.toLowerCase();
-    const ref = document.referrer.toLowerCase();
-
-    if (ref.includes("facebook")) platform = "Facebook";
-    else if (ref.includes("twitter")) platform = "Twitter";
-    else if (ref.includes("linkedin")) platform = "LinkedIn";
-    else if (ref.includes("instagram")) platform = "Instagram";
-    else if (ref.includes("whatsapp")) platform = "WhatsApp";
-    else if (ua.includes("android")) platform = "Android Browser";
-    else if (ua.includes("iphone") || ua.includes("ipad"))
-      platform = "iOS Browser";
-    else if (ua.includes("firefox")) platform = "Firefox";
-    else if (ua.includes("chrome")) platform = "Chrome";
-    else if (ua.includes("safari")) platform = "Safari";
-
-    const input = document.getElementById("platformInput");
-    if (input) input.value = platform;
+  // read ?source= from URL (if present)
+  function getSourceFromQuery() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get("source");
+      return s ? decodeURIComponent(s) : null;
+    } catch (e) {
+      return null;
+    }
   }
 
-  // Client-side file size check and image preview
+  // robust client-side platform detection
+  function detectPlatform() {
+    // Preference order: explicit ?source= -> referrer hints -> UA heuristics -> navigator.platform
+    const sourceParam = getSourceFromQuery();
+    if (sourceParam) return sourceParam;
+
+    let platform = "Unknown";
+    const ua = (navigator.userAgent || "").toLowerCase();
+    const ref = (document.referrer || "").toLowerCase();
+    const navPlatform = (navigator.platform || "").toLowerCase();
+
+    if (
+      ref.includes("facebook.com") ||
+      ua.includes("fbav") ||
+      ua.includes("fban")
+    ) {
+      platform = "Facebook (in-app)";
+    } else if (ref.includes("twitter.com") || ua.includes("twitter")) {
+      platform = "Twitter";
+    } else if (ref.includes("linkedin.com") || ua.includes("linkedin")) {
+      platform = "LinkedIn";
+    } else if (ua.includes("instagram")) {
+      platform = "Instagram";
+    } else if (ua.includes("whatsapp") || ref.includes("whatsapp")) {
+      platform = "WhatsApp";
+    } else if (ua.includes("crios")) {
+      platform = "Chrome (iOS)";
+    } else if (ua.includes("edg") || ua.includes("edge")) {
+      platform = "Edge";
+    } else if (ua.includes("firefox")) {
+      platform = "Firefox";
+    } else if (ua.includes("chrome")) {
+      platform = "Chrome";
+    } else if (ua.includes("safari")) {
+      platform = "Safari";
+    } else if (navPlatform.includes("iphone") || navPlatform.includes("ipad")) {
+      platform = "iOS Browser";
+    } else if (navPlatform.includes("android")) {
+      platform = "Android Browser";
+    }
+    return platform;
+  }
+
+  // file input preview & size check
   function setupFileInputs() {
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-
     document.querySelectorAll('input[type="file"]').forEach((input) => {
       input.addEventListener("change", (e) => {
         const file = e.target.files[0];
@@ -240,8 +274,7 @@ block content %}
           return;
         }
 
-        // Show a preview for images
-        if (file.type.startsWith("image/")) {
+        if (file.type && file.type.startsWith("image/")) {
           const img = document.createElement("img");
           img.src = URL.createObjectURL(file);
           img.alt = "preview";
@@ -259,17 +292,27 @@ block content %}
     });
   }
 
-  // Prevent double submit while upload is in progress (simple UX)
+  // init on DOM ready
   document.addEventListener("DOMContentLoaded", () => {
-    detectPlatform();
+    // set platform hidden input (prefer ?source= if present)
+    const platformInput = document.getElementById("platformInput");
+    if (platformInput) {
+      const sourceParam = getSourceFromQuery();
+      platformInput.value = sourceParam || detectPlatform() || "Unknown";
+    }
+
     setupFileInputs();
 
     const form = document.getElementById("survey-form");
-    form.addEventListener("submit", () => {
-      const btn = document.getElementById("submitBtn");
-      btn.disabled = true;
-      btn.textContent = "Submitting...";
-    });
+    if (form) {
+      form.addEventListener("submit", () => {
+        const btn = document.getElementById("submitBtn");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Submitting...";
+        }
+      });
+    }
   });
 </script>
 {% endblock %}

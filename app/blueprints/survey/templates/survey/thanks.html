@@ -5,11 +5,14 @@ content %}
   <p class="text-lg text-gray-700 mb-6">
     Your response to <b>{{ survey.title }}</b> has been recorded.
   </p>
+
+  {% if current_user.is_authenticated and current_user.uid == survey.user_id %}
   <a
     href="{{ url_for('survey.dashboard') }}"
     class="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded"
   >
     Back to Dashboard
   </a>
+  {% endif %}
 </div>
 {% endblock %}
